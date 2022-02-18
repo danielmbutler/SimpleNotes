@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">DragandDropDemo</string>
+    <string name="app_name">Simple Notes</string>
+    <string name="title">Title</string>
+    <string name="note">Note</string>
+    <string name="add_note">Add note</string>
+    <string name="save">Save</string>
 </resources>

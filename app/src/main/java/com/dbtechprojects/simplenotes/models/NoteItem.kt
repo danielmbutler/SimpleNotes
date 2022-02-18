@@ -1,4 +1,4 @@
-package com.dbtechprojects.draganddropdemo.models
+package com.dbtechprojects.simplenotes.models
 
 import java.io.Serializable
 
@@ -7,5 +7,5 @@ data class NoteItem(
     val id: Int? = null,
     val title: String? = null,
     val note: String? = null,
-    val TimeStamp: String? = null,
+    val timeStamp: String? = null,
 ): Serializable
