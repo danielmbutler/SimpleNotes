@@ -1,4 +1,4 @@
-package com.dbtechprojects.draganddropdemo
+package com.dbtechprojects.simplenotes
 
 import org.junit.Test
 

@@ -1,11 +1,17 @@
 package com.dbtechprojects.simplenotes.models
 
-import java.io.Serializable
+import android.os.Parcelable
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import kotlinx.parcelize.Parcelize
 
-
+@Entity(tableName = "notes")
+@Parcelize
 data class NoteItem(
+    @PrimaryKey
     val id: Int? = null,
-    val title: String? = null,
-    val note: String? = null,
-    val timeStamp: String? = null,
-): Serializable
+    @ColumnInfo(name = "title") val title: String? = null,
+    @ColumnInfo(name = "note") val note: String? = null,
+    @ColumnInfo(name = "timeStamp")val timeStamp: String? = null,
+): Parcelable

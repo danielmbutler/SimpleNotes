@@ -12,7 +12,7 @@ import com.dbtechprojects.simplenotes.models.NoteItem
 
 
 class NotesAdapter(
-    private var list: MutableList<NoteItem>,
+    private var list: List<NoteItem>,
     private var clickListener: NoteClickListener
     )
     : RecyclerView.Adapter<ListViewHolder>() {
