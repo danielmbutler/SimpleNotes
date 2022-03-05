@@ -17,6 +17,9 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary true
+        }
     }
 
     buildTypes {
@@ -31,18 +34,31 @@ android {
     }
     kotlinOptions {
         jvmTarget = '1.8'
+        useIR = true
+    }
+    buildFeatures {
+        compose true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.1.1"
+    }
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
     }
 }
 
 dependencies {
+    def compose_version = "1.1.1"
 
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation 'androidx.core:core-ktx:1.3.2'
     implementation 'androidx.appcompat:appcompat:1.2.0'
     implementation 'com.google.android.material:material:1.3.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
-    testImplementation 'junit:junit:4.+'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
+
 
     def roomVersion = "2.4.2"
 
@@ -53,4 +69,18 @@ dependencies {
 
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.4.1"
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.4.1"
+
+
+    // Integration with activities
+    implementation 'androidx.activity:activity-compose:1.4.0'
+    // Compose Material Design
+    implementation 'androidx.compose.material:material:1.1.1'
+    // Animations
+    implementation 'androidx.compose.animation:animation:1.1.1'
+    // Tooling support (Previews, etc.)
+    implementation 'androidx.compose.ui:ui-tooling:1.1.1'
+    // Integration with ViewModels
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.4.1'
+    // UI Tests
+    androidTestImplementation 'androidx.compose.ui:ui-test-junit4:1.1.1'
 }
