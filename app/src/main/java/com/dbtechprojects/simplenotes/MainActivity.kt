@@ -1,164 +1,341 @@
 package com.dbtechprojects.simplenotes
 
-import android.content.ClipDescription
 import android.os.Bundle
-import android.view.DragEvent
-import android.view.View
-import android.widget.ImageView
+import android.util.Log
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.dbtechprojects.simplenotes.adapter.NoteClickListener
-import com.dbtechprojects.simplenotes.adapter.NotesAdapter
 import com.dbtechprojects.simplenotes.database.NotesDao
 import com.dbtechprojects.simplenotes.database.NotesDatabase
-import com.dbtechprojects.simplenotes.dialogs.AddNoteListener
-import com.dbtechprojects.simplenotes.dialogs.NoteDialog
 import com.dbtechprojects.simplenotes.models.NoteItem
-import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.dbtechprojects.simplenotes.ui.theme.DragandDropDemoTheme
+import com.dbtechprojects.simplenotes.ui.theme.NotesBackground
+import com.dbtechprojects.simplenotes.ui.theme.NotesViewBackground
+import com.dbtechprojects.simplenotes.ui.theme.Purple700
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlin.reflect.KFunction3
 
-
-class MainActivity : AppCompatActivity(), AddNoteListener, NoteClickListener {
+class MainActivity : ComponentActivity() {
 
     private lateinit var dbHandler: NotesDao
-    private lateinit var notesBin: ImageView
-    private lateinit var recyclerView: RecyclerView
-    private var isDrawableSet = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_notesview)
         dbHandler = NotesDatabase.provideDB(applicationContext).noteDao()
-
-        val floatingbutton = findViewById<FloatingActionButton>(R.id.floatingActionButton)
-
-        floatingbutton.setOnClickListener {
-            val dialog =
-                NoteDialog(this, null)
-            dialog.show(supportFragmentManager, "Add Note")
-        }
-        notesBin = findViewById<ImageView>(R.id.notesviewbin)
-
-        notesBin.setOnDragListener(dragListener)
-        setupRecyclerView()
-        initObservers()
-
-    }
-
-    private fun initObservers() {
-        dbHandler.getAllNotes().observe(this, { notes ->
-            val adapter = NotesAdapter(notes, this)
-            recyclerView.adapter = adapter
-        })
-    }
-
-
-    private fun setupRecyclerView(
-    ) {
-
-        recyclerView = findViewById<RecyclerView>(R.id.notesrecyclerview)
-        val horizontalLayoutManagaer =
-            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-
-        recyclerView.layoutManager = horizontalLayoutManagaer
-    }
-
-    private val dragListener = View.OnDragListener { view, event ->
-        when (event.action) {
-            DragEvent.ACTION_DRAG_STARTED -> {
-                event.clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)
-            }
-            DragEvent.ACTION_DRAG_ENTERED -> {
-                view.invalidate()
-                true
-            }
-            DragEvent.ACTION_DRAG_LOCATION -> true
-            DragEvent.ACTION_DRAG_EXITED -> {
-                view.invalidate()
-                true
-            }
-            DragEvent.ACTION_DROP -> {
-                val item = event.clipData.getItemAt(0)
-                val noteId = item.text.toString()
-                showDeleteDialog(noteId)
-
-                true
-            }
-            DragEvent.ACTION_DRAG_ENDED -> {
-
-                true
-            }
-            else -> false
-        }
-    }
-
-    private fun showDeleteDialog(noteId: String) {
-        val builder = AlertDialog.Builder(this)
-        builder.setMessage("Are you sure you want to delete this note ?")
-            .setCancelable(false)
-            .setPositiveButton("Yes") { dialog, id ->
-                deleteNote(noteId)
-                dialog.dismiss()
-            }
-
-            .setNegativeButton("No") { dialog, id ->
-                // Dismiss the dialog
-                dialog.dismiss()
-            }
-        val dialog = builder.create()
-        dialog.show()
-    }
-
-    private fun deleteNote(noteId: String) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val result = dbHandler.delete(noteId.toInt())
-
-            withContext(Dispatchers.Main) {
-                if (result > 0) {
-                    Toast.makeText(this@MainActivity, "Note has been deleted", Toast.LENGTH_SHORT).show()
-                    setBinDrawable()
-                } else {
-                    Toast.makeText(this@MainActivity, "Error deleting", Toast.LENGTH_SHORT).show()
-                    showDeleteDialog(noteId)
+        setContent {
+            DragandDropDemoTheme {
+                Surface(color = MaterialTheme.colors.background) {
+                    AppScaffold(dbHandler, this::addOrSaveNote, this::deleteNote)
                 }
             }
         }
-
     }
 
-    private fun setBinDrawable() {
-        if (!isDrawableSet) {
-            isDrawableSet = true
-            notesBin.setImageDrawable(ContextCompat.getDrawable(this, R.drawable.bin))
-        }
-    }
-
-    override fun addNote(note: NoteItem) {
+    private fun addOrSaveNote(noteTitle: String, noteBody: String, noteId: Int) {
         lifecycleScope.launch(Dispatchers.IO) {
-            dbHandler.insertNote(note)
+            if (noteId == 0) {
+                // add new note
+                dbHandler.insertNote(NoteItem(title = noteTitle, note = noteBody))
+            } else {
+                // update note
+                dbHandler.updateNote(NoteItem(id = noteId, title = noteTitle, noteBody))
+            }
         }
     }
 
-    override fun editNote(note: String, title: String, id: Int) {
-        val noteItem = NoteItem(note = note, title = title, id = id)
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            dbHandler.updateNote(noteItem)
+    private fun deleteNote(noteId: Int){
+        lifecycleScope.launch {
+            dbHandler.delete(noteId)
         }
-
     }
-
-    override fun onClick(noteItem: NoteItem) {
-        val dialog =
-            NoteDialog(this, noteItem)
-        dialog.show(supportFragmentManager, "Edit note")
-    }
-
 }
+
+@Composable
+fun AppScaffold(
+    dbHandler: NotesDao,
+    addOrSave: KFunction3<String, String, Int, Unit>,
+    deleteNote: (Int) -> Unit
+) {
+    val notes = dbHandler.getAllNotes()
+    val shouldShowNoteDialog = remember { mutableStateOf(false) }
+    val shouldShowDeleteDialog = remember { mutableStateOf(false) }
+    val hasBinDrawableChanged = remember { mutableStateOf(false) }
+    val currentNoteTitle = remember { mutableStateOf("") }
+    val currentNoteBody = remember { mutableStateOf("") }
+    val currentNoteId = remember { mutableStateOf(0) }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(id = R.string.app_name)) },
+                backgroundColor = Purple700
+            )
+        },
+        content = {
+            Column(
+                Modifier
+                    .background(NotesViewBackground)
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+            ) {
+                NotesList(
+                    notesList = notes,
+                    currentNoteTitle,
+                    currentNoteBody,
+                    currentNoteId,
+                    shouldShowNoteDialog,
+                    shouldShowDeleteDialog
+                )
+                BinImage(hasBinDrawableChanged)
+                NotesDialog(
+                    showDialog = shouldShowNoteDialog, noteTitle = currentNoteTitle,
+                    noteBody = currentNoteBody, noteId = currentNoteId, addOrSave
+                )
+                DeleteDialog(
+                    showDialog = shouldShowDeleteDialog,
+                    noteId = currentNoteId, deleteNote = deleteNote,
+                    hasBinDrawableChanged = hasBinDrawableChanged
+                )
+
+            }
+
+        },
+        floatingActionButtonPosition = FabPosition.End,
+        floatingActionButton = {
+            FloatingActionButton(onClick = {
+                shouldShowNoteDialog.value = !shouldShowNoteDialog.value
+                currentNoteTitle.value = ""
+                currentNoteBody.value = ""
+            }, backgroundColor = Purple700) {
+                Text("+")
+            }
+        }
+    )
+}
+
+@Composable
+fun BinImage(hasBinDrawableChanged : MutableState<Boolean>) {
+    val hasChanged = remember{hasBinDrawableChanged}
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(id = if (!hasChanged.value) R.drawable.png_bin else R.drawable.bin),
+            contentDescription = "Notes Bin",
+            modifier = Modifier
+                .height(90.dp)
+                .width(90.dp)
+                .padding(bottom = 12.dp)
+                .align(Alignment.BottomStart)
+        )
+    }
+}
+
+@Composable
+fun NotesList(
+    notesList: LiveData<List<NoteItem>>,
+    currentNoteTitle: MutableState<String>,
+    currentNoteBody: MutableState<String>,
+    currentNoteId: MutableState<Int>,
+    showDialog: MutableState<Boolean>,
+    showDeleteDialog : MutableState<Boolean>
+) {
+
+    val notes = notesList.observeAsState()
+
+    LazyRow(
+        modifier = Modifier
+            .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        itemsIndexed(items = notes.value ?: listOf(), itemContent = { index, item ->
+            Column(
+                modifier = Modifier
+                    .background(color = NotesBackground)
+                    .height(120.dp)
+                    .width(120.dp)
+                    .padding(12.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                currentNoteTitle.value = notes.value?.get(index)?.title ?: ""
+                                currentNoteBody.value = notes.value?.get(index)?.note ?: ""
+                                currentNoteId.value = notes.value?.get(index)?.id ?: 0
+                                showDialog.value = true
+                                Log.d("note", "note : ${item.title} , $currentNoteBody")
+                            },
+                            onLongPress = {
+                                currentNoteId.value = notes.value?.get(index)?.id ?: 0
+                                showDeleteDialog.value = true
+                            }
+                        )
+                    }
+
+            ) {
+                Text(text = item.title.toString(), fontWeight = FontWeight.Bold)
+                Text(text = item.note.toString(), modifier = Modifier.padding(bottom = 12.dp))
+            }
+        })
+    }
+}
+
+@Composable
+fun DeleteDialog(
+    showDialog: MutableState<Boolean>,
+    noteId: MutableState<Int>,
+    deleteNote: (Int) -> Unit,
+    hasBinDrawableChanged: MutableState<Boolean>
+) {
+    MaterialTheme {
+        Column {
+            val openDialog = remember { showDialog  }
+
+            Button(onClick = {
+                openDialog.value = true
+            }) {
+                Text("Click me")
+            }
+
+            if (openDialog.value) {
+
+                AlertDialog(
+                    onDismissRequest = {
+                        openDialog.value = false
+                    },
+                    title = {
+                        Text(text = "Delete Note")
+                    },
+                    text = {
+                        Text("Are you sure you want to delete this note ? ")
+                    },
+                    confirmButton = {
+                        Button(
+
+                            onClick = {
+                                openDialog.value = false
+                                deleteNote.invoke(noteId.value)
+                                if (!hasBinDrawableChanged.value){
+                                    hasBinDrawableChanged.value = true
+                                }
+                            }) {
+                            Text("Yes")
+                        }
+                    },
+                    dismissButton = {
+                        Button(
+
+                            onClick = {
+                                openDialog.value = false
+                            }) {
+                            Text("No")
+                        }
+                    }
+                )
+            }
+        }
+
+    }
+}
+
+
+@Composable
+fun NotesDialog(
+    showDialog: MutableState<Boolean>,
+    noteTitle: MutableState<String>? = null,
+    noteBody: MutableState<String>? = null,
+    noteId: MutableState<Int>? = null,
+    onClick: (String, String, Int) -> Unit
+) {
+
+    val shouldShow = remember { showDialog }
+    if (shouldShow.value) {
+        Dialog(onDismissRequest = {}) {
+            Surface(
+                modifier = Modifier
+                    .width(350.dp)
+                    .height(350.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.LightGray
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center
+                ) {
+                    val titleState =
+                        remember { mutableStateOf(TextFieldValue(noteTitle?.value ?: "")) }
+                    val noteState =
+                        remember { mutableStateOf(TextFieldValue(noteBody?.value ?: "")) }
+                    val context = LocalContext.current
+
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(12.dp)
+                    ) {
+                        Text("Note Title")
+                        TextField(
+                            value = titleState.value,
+                            onValueChange = { titleState.value = it },
+                            maxLines = 1,
+                            singleLine = true
+                        )
+                        Text("Note Body", modifier = Modifier.padding(top = 12.dp))
+                        TextField(
+                            value = noteState.value,
+                            onValueChange = { noteState.value = it },
+                            modifier = Modifier
+                                .height(180.dp)
+                                .padding(bottom = 12.dp),
+                            maxLines = 20
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            if (titleState.value.text.isEmpty() || noteState.value.text.isEmpty()) {
+                                Toast.makeText(
+                                    context,
+                                    "Please add a note title and a note body",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return@Button
+                            }
+                            onClick.invoke(
+                                titleState.value.text,
+                                noteState.value.text,
+                                noteId?.value ?: 0
+                            )
+                            noteTitle?.value = ""
+                            noteBody?.value = ""
+                            noteId?.value = 0
+                            shouldShow.value = false
+                        },
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    ) {
+                        Text(text = "Save")
+                    }
+                }
+            }
+        }
+    }
+}
+
